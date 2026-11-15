@@ -1,0 +1,1993 @@
+```html
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sürgün Kralın İntikamı</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Sinematik yazılar için animasyonlar */
+        @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up {
+            animation: fadeUp 1s ease-out forwards;
+        }
+        .delay-1 { animation-delay: 0.4s; opacity: 0; }
+        .delay-2 { animation-delay: 1.2s; opacity: 0; }
+        .delay-3 { animation-delay: 2.0s; opacity: 0; }
+        .delay-4 { animation-delay: 2.8s; opacity: 0; }
+
+        /* Özel Buton Şekilleri */
+        .btn-attack {
+            border-radius: 9999px;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5), inset 0 2px 4px rgba(255,255,255,0.4);
+            transition: transform 0.08s ease, filter 0.1s ease;
+        }
+        .btn-attack:active, .btn-attack.pressed {
+            transform: scale(0.90);
+            filter: brightness(1.2);
+        }
+
+        /* Özellik 1 Butonu: Altıgen / Elmas Kesim */
+        .btn-skill-1 {
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            transition: transform 0.08s ease;
+        }
+        .btn-skill-1:active, .btn-skill-1.pressed {
+            transform: scale(0.90);
+        }
+
+        /* Özellik 2 Butonu: Kalkan / Sivri Kama Şekli */
+        .btn-skill-2 {
+            border-radius: 24px 24px 50% 50%;
+            box-shadow: 0 6px 18px rgba(168, 85, 247, 0.5), inset 0 2px 4px rgba(255,255,255,0.4);
+            transition: transform 0.08s ease;
+        }
+        .btn-skill-2:active, .btn-skill-2.pressed {
+            transform: scale(0.90);
+        }
+
+        /* Özel Kaydırma Çubuğu */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="relative w-full h-full overflow-hidden select-none">
+
+    <!-- OYUN KANVASI -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- ÜST BİLGİ PANELİ (HUD) -->
+    <div id="hudPanel" class="hidden absolute top-0 left-0 w-full p-3 sm:p-4 pointer-events-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 z-10">
+        <!-- Sol: Kral Durumu ve Aşama -->
+        <div class="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-2xl px-4 py-2.5 shadow-xl flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-600 border-2 border-amber-400 flex items-center justify-center shadow-inner relative">
+                <span class="text-xs font-extrabold text-white" id="hudPlayerHp">200</span>
+                <span class="absolute -top-2.5 text-amber-400 text-sm">👑</span>
+            </div>
+            <div>
+                <div class="text-xs font-bold uppercase tracking-wider text-amber-400" id="hudPhaseTitle">AŞAMA 1: GÜÇLENME</div>
+                <div class="text-sm font-semibold text-slate-200" id="hudObjective">Kuklalara vurarak güçlen!</div>
+            </div>
+        </div>
+
+        <!-- Sağ: Ordu Sayaçları ve Silah/Büyü Bilgisi -->
+        <div class="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
+            <div id="hudArmyCounter" class="hidden bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3.5 py-2 shadow-xl flex items-center gap-3 text-xs sm:text-sm font-bold">
+                <span class="text-sky-400 flex items-center gap-1">🔵 Biz: <b id="hudAllyCount">1</b></span>
+                <span class="text-slate-500">|</span>
+                <span class="text-rose-400 flex items-center gap-1">🔴 Düşman: <b id="hudEnemyCount">31</b></span>
+            </div>
+
+            <div class="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3.5 py-2 shadow-xl text-right">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400">Kuşanılan Güç</div>
+                <div class="text-xs sm:text-sm font-bold text-amber-300" id="hudWeaponName">Yumruk</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EKRAN KONTROLLERİ (SOL JOYSTICK + SAĞ SALDIRI & ÖZELLİK BUTONLARI) -->
+    <div id="controlsOverlay" class="hidden absolute inset-0 pointer-events-none z-10">
+        <!-- Sol Alt: Sanal Konsol (Joystick) -->
+        <div id="joystickZone" class="pointer-events-auto absolute bottom-5 left-5 sm:bottom-8 sm:left-8 w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-slate-900/50 border-2 border-slate-600/60 backdrop-blur-sm flex items-center justify-center shadow-2xl">
+            <div id="joystickKnob" class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-blue-600 to-sky-400 border-2 border-white/80 shadow-lg pointer-events-none transition-transform duration-75"></div>
+            <span class="absolute -bottom-5 text-[10px] font-semibold text-slate-400 tracking-wider uppercase">Hareket (WASD)</span>
+        </div>
+
+        <!-- Sağ Alt: Aksiyon Butonları (Farklı Şekillerde) -->
+        <div class="pointer-events-auto absolute bottom-5 right-5 sm:bottom-8 sm:right-8 flex items-end gap-3 sm:gap-4">
+            
+            <!-- Özellik 2 Butonu (Kalkan / Sivri Kama Şekli) -->
+            <div class="flex flex-col items-center gap-1 mb-12 sm:mb-14">
+                <button id="btnSkill2" class="btn-skill-2 relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-b from-purple-500 to-indigo-700 border-2 border-purple-300/80 flex flex-col items-center justify-center text-white overflow-hidden">
+                    <span id="iconSkill2" class="text-xl sm:text-2xl">🛡️</span>
+                    <span id="labelSkill2" class="text-[9px] sm:text-[10px] font-bold leading-tight px-1 text-center">Özellik 2</span>
+                    <div id="cdOverlay2" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center text-sm font-extrabold text-amber-300">0.0</div>
+                </button>
+                <span class="text-[10px] font-bold text-purple-300 bg-slate-900/70 px-2 py-0.5 rounded-full">Özellik 2 (K)</span>
+            </div>
+
+            <!-- Özellik 1 Butonu (Altıgen Şekil) -->
+            <div class="flex flex-col items-center gap-1 mb-4 sm:mb-5">
+                <button id="btnSkill1" class="btn-skill-1 relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-amber-500 to-orange-600 flex flex-col items-center justify-center text-white shadow-xl">
+                    <span id="iconSkill1" class="text-xl sm:text-2xl">⚡</span>
+                    <span id="labelSkill1" class="text-[9px] sm:text-[10px] font-bold leading-tight px-1 text-center">Özellik 1</span>
+                    <div id="cdOverlay1" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center text-sm font-extrabold text-amber-300">0.0</div>
+                </button>
+                <span class="text-[10px] font-bold text-amber-300 bg-slate-900/70 px-2 py-0.5 rounded-full">Özellik 1 (J)</span>
+            </div>
+
+            <!-- Ana Saldırı Butonu (Büyük Daire) -->
+            <div class="flex flex-col items-center gap-1">
+                <button id="btnAttack" class="btn-attack relative w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-tr from-red-600 via-rose-500 to-orange-500 border-4 border-white/80 flex flex-col items-center justify-center text-white">
+                    <span id="iconAttack" class="text-2xl sm:text-3xl">⚔️</span>
+                    <span class="text-xs sm:text-sm font-extrabold tracking-wide uppercase">SALDIR</span>
+                </button>
+                <span class="text-[10px] font-bold text-rose-300 bg-slate-900/70 px-2 py-0.5 rounded-full">Vuruş (Boşluk)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. SİNEMATİK HİKAYE EKRANI -->
+    <div id="cinematicModal" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-950/40 via-slate-950 to-black pointer-events-none"></div>
+        
+        <div class="relative z-10 max-w-2xl w-full space-y-6">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-600 border-4 border-amber-400 shadow-[0_0_40px_rgba(37,99,235,0.7)] mx-auto mb-2 relative">
+                <span class="absolute -top-6 text-3xl">👑</span>
+                <span class="font-extrabold text-white text-lg">KRAL</span>
+            </div>
+
+            <h1 id="cinematicTitle" class="font-cinzel text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-500 to-amber-600 tracking-wide">
+                SÜRGÜN KRALIN İNTİKAMI
+            </h1>
+
+            <div id="cinematicStoryContainer" class="space-y-4 text-base sm:text-lg text-slate-300 leading-relaxed font-medium bg-slate-900/60 border border-slate-800 p-6 rounded-3xl backdrop-blur-md shadow-2xl">
+                <p class="animate-fade-up delay-1">
+                    Sen, kendi askerlerin tarafından ihanete uğrayıp tahtından indirilmiş ve sürgün edilmiş eski bir kralsın...
+                </p>
+                <p class="animate-fade-up delay-2 text-blue-300">
+                    Yıllar boyunca sürgünde tek başına çalıştın, kaslarını ve iradeni çelik gibi dövdün. Artık eski zayıf kral değilsin!
+                </p>
+                <p class="animate-fade-up delay-3 text-rose-400 font-semibold">
+                    Şimdi intikam vakti! Önce eğitim alanında güçlen, silahını seç ve kapıda bekleyen 31 kişilik hain orduyu ezerek tahtını geri al!
+                </p>
+            </div>
+
+            <div class="animate-fade-up delay-4 pt-2">
+                <button id="btnStartTraining" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-lg shadow-[0_0_25px_rgba(37,99,235,0.6)] border border-blue-400/50 transition transform hover:scale-105 active:scale-95 cursor-pointer">
+                    EĞİTİME VE GÜÇLENMEYE BAŞLA ⚔️
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. SİLAH / ALET SEÇİM EKRANI (5 SEÇENEK) -->
+    <div id="weaponModal" class="hidden fixed inset-0 z-40 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-4xl w-full bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-8 shadow-2xl my-auto">
+            <div class="text-center mb-6">
+                <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">İntikam Hazırlığı</span>
+                <h2 class="font-cinzel text-2xl sm:text-3xl font-black text-white mt-2">Savaş Aletini Seç</h2>
+                <p class="text-slate-400 text-sm mt-1">31 kişilik hain orduya karşı kullanacağın silahı kuşan. Her silahın kendine özgü 2 yeteneği vardır!</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="weaponCardsContainer">
+                <!-- Kartlar JS ile doldurulacak -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. BÜYÜ ELEMENTİ SEÇİM EKRANI (ORDUYU YENDİKTEN SONRA) -->
+    <div id="magicModal" class="hidden fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-lg flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-5xl w-full bg-slate-900 border-2 border-purple-500/50 rounded-3xl p-5 sm:p-8 shadow-[0_0_50px_rgba(168,85,247,0.3)] my-auto">
+            <div class="text-center mb-6">
+                <div class="inline-block px-4 py-1 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 text-xs font-extrabold uppercase tracking-widest mb-2">
+                    👑 TAHT GERİ ALINDI • KADİM BÜYÜ AÇILDI!
+                </div>
+                <h2 class="font-cinzel text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-amber-300">
+                    Büyü Türünü Seç
+                </h2>
+                <p class="text-slate-300 text-sm sm:text-base mt-2 max-w-2xl mx-auto">
+                    31 kişilik hain orduyu yok ettin ve yeniden <b class="text-amber-400">Kral</b> oldun! Ancak diğer krallıklar birleşip <b>150 kişilik dev orduları ve krallarıyla</b> saldırıya geçti. Seçeceğin büyü ile kendi 20 kişilik orduna önderlik et!
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="magicCardsContainer">
+                <!-- 6 Büyü Kartı JS ile doldurulacak -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. ARA SAHNE / BÜYÜK SAVAŞ BAŞLANGIÇ MODALI -->
+    <div id="warIntroModal" class="hidden fixed inset-0 z-40 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 text-center">
+        <div class="max-w-xl w-full bg-slate-900 border-2 border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+            <div class="text-4xl">👑⚔️🔥</div>
+            <h2 class="font-cinzel text-2xl sm:text-3xl font-black text-amber-400">BÜYÜK KRALLIKLAR SAVAŞI</h2>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+                Tahta yeniden geçmeni hazmedemeyen düşman krallar güçlerini birleştirdi!
+            </p>
+            <div class="grid grid-cols-2 gap-3 text-left bg-slate-950/70 p-4 rounded-2xl border border-slate-800 text-xs sm:text-sm">
+                <div class="space-y-1">
+                    <div class="font-extrabold text-sky-400">🔵 SENİN ORDUN</div>
+                    <div>• <b>Sen (Kral):</b> 250 Can / 50 Hasar</div>
+                    <div>• <b>20 Asker:</b> 100 Can / 25 Hasar</div>
+                    <div class="text-purple-400 font-semibold" id="warSelectedMagicText">• Büyü: Seçildi</div>
+                </div>
+                <div class="space-y-1 border-l border-slate-800 pl-3">
+                    <div class="font-extrabold text-rose-400">🔴 DÜŞMAN İTTİFAKI</div>
+                    <div>• <b>3 Düşman Kralı:</b> 250 Can / 50 Hasar</div>
+                    <div>• <b>150 Asker:</b> 100 Can / 25 Hasar</div>
+                    <div class="text-slate-400">• Tamamı saldırıya geçti!</div>
+                </div>
+            </div>
+            <button id="btnStartGrandWar" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-red-600 hover:from-amber-400 hover:to-red-500 text-white font-extrabold text-lg shadow-lg transition transform hover:scale-[1.02] active:scale-95 cursor-pointer">
+                ORDUNLA BİRLİKTE HÜCUMA GEÇ! 🚩
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. OYUN SONU (ZAFER / YENİLGİ) EKRANI -->
+    <div id="endModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 text-center">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-8 shadow-2xl space-y-5">
+            <div id="endIcon" class="text-6xl">👑</div>
+            <h2 id="endTitle" class="font-cinzel text-3xl font-black text-amber-400">MUTLAK ZAFER!</h2>
+            <p id="endDesc" class="text-slate-300 text-sm sm:text-base leading-relaxed">
+                Tüm düşman kralları ve 150 kişilik ordularını yok ettin. İntikamın tamamlandı, artık tüm diyarın tek hükümdarısın!
+            </p>
+            <div class="bg-slate-950/60 rounded-2xl p-3 text-xs text-slate-400 flex justify-around">
+                <span>Yok Edilen Düşman: <b id="endKills" class="text-white">0</b></span>
+                <span>Kalan Canın: <b id="endHpLeft" class="text-sky-400">0</b></span>
+            </div>
+            <button onclick="location.reload()" class="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-base shadow-lg transition cursor-pointer">
+                YENİDEN OYNA 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- EĞİTİM TAMAMLANDI / SİLAH SEÇ BUTONU (Eğitim sahnesinde altta çıkar) -->
+    <div id="trainingReadyBanner" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-20 bg-emerald-600/95 border-2 border-emerald-300 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce">
+        <span class="text-sm font-bold">💪 Yeterince Güçlendin!</span>
+        <button id="btnOpenWeaponSelect" class="px-4 py-1.5 bg-white text-emerald-900 font-extrabold text-xs sm:text-sm rounded-xl shadow hover:bg-emerald-100 cursor-pointer">
+            Silah Seç ve Saldır! ⚔️
+        </button>
+    </div>
+
+    <script>
+        /**
+         * SÜRGÜN KRALIN İNTİKAMI - 2D AKSİYON VE ORDU SAVAŞI OYUNU
+         * Tek dosya, sıfır harici görsel bağımlılığı, dokunmatik + klavye uyumlu.
+         */
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Ekran boyutlandırma
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- SİLAH VE BÜYÜ VERİTABANI ---
+        const WEAPONS = [
+            {
+                id: 'bow',
+                num: 1,
+                name: 'Yay ve Ok',
+                icon: '🏹',
+                desc: 'Uzaktan hızlı ok atar. Düşmanlar yaklaşmadan avla.',
+                skill1Name: 'Üçlü Ok',
+                skill1Icon: '🔱',
+                skill1Cd: 3.0,
+                skill2Name: 'Ok Yağmuru',
+                skill2Icon: '🌧️',
+                skill2Cd: 6.0,
+                range: 340,
+                attackCd: 0.38,
+                color: '#f59e0b'
+            },
+            {
+                id: 'sword_shield',
+                num: 2,
+                name: 'Kılıç ve Kalkan',
+                icon: '🗡️🛡️',
+                desc: 'Dengeli kılıç darbeleri ve koruyucu kalkan darbesi.',
+                skill1Name: 'Kalkan Vuruşu',
+                skill1Icon: '🛡️',
+                skill1Cd: 3.5,
+                skill2Name: 'Kral Kesiği',
+                skill2Icon: '⚔️',
+                skill2Cd: 5.5,
+                range: 95,
+                attackCd: 0.35,
+                color: '#38bdf8'
+            },
+            {
+                id: 'dual_axes',
+                num: 3,
+                name: 'İki Tane Balta',
+                icon: '🪓🪓',
+                desc: 'Çok hızlı çift balta saldırısı ve ölümcül kasırga dönüşü.',
+                skill1Name: 'Çifte Yarık',
+                skill1Icon: '❌',
+                skill1Cd: 3.0,
+                skill2Name: 'Balta Kasırgası',
+                skill2Icon: '🌀',
+                skill2Cd: 5.0,
+                range: 88,
+                attackCd: 0.26,
+                color: '#f43f5e'
+            },
+            {
+                id: 'spear_shield',
+                num: 4,
+                name: 'Mızrak ve Kalkan',
+                icon: '🔱🛡️',
+                desc: 'Uzun menzilli delici mızrak ve düşmanı ezen kalkan hücumu.',
+                skill1Name: 'Uzun Saplama',
+                skill1Icon: '📍',
+                skill1Cd: 3.0,
+                skill2Name: 'Kalkan Hücumu',
+                skill2Icon: '💨',
+                skill2Cd: 5.5,
+                range: 135,
+                attackCd: 0.40,
+                color: '#10b981'
+            },
+            {
+                id: 'magic_locked',
+                num: 5,
+                name: 'Büyü (Kilitli)',
+                icon: '🔮🔒',
+                desc: '31 kişilik orduyu yendikten sonra açılır! 6 kadim element içerir.',
+                locked: true
+            }
+        ];
+
+        // Kullanıcının verdiği numaralandırmaya göre (1, 2, 3, 4, 6, 7) 6 Büyü Elementi
+        const MAGICS = [
+            {
+                id: 'fire',
+                num: 1,
+                name: 'Ateş Büyüsü',
+                icon: '🔥',
+                color: '#ef4444',
+                desc: 'Yıkıcı alev topları ve yakın mesafede kavurucu ateş püskürtme.',
+                skill1Name: 'Ateş Topu',
+                skill1Icon: '☄️',
+                skill1Cd: 2.2,
+                skill2Name: 'Ateş Püskürt',
+                skill2Icon: '🔥',
+                skill2Cd: 4.5
+            },
+            {
+                id: 'ice',
+                num: 2,
+                name: 'Buz Büyüsü',
+                icon: '❄️',
+                color: '#38bdf8',
+                desc: 'Keskin buz topları fırlatır ve etrafındaki düşmanları dondurur.',
+                skill1Name: 'Buz Topları',
+                skill1Icon: '🧊',
+                skill1Cd: 2.2,
+                skill2Name: 'Dondur',
+                skill2Icon: '❄️',
+                skill2Cd: 5.0
+            },
+            {
+                id: 'earth',
+                num: 3,
+                name: 'Taş Büyüsü',
+                icon: '🪨',
+                color: '#a8a29e',
+                desc: 'Devasa kayalar fırlatır ve düşmanları hareketsiz taş heykellere çevirir.',
+                skill1Name: 'Büyük Taş',
+                skill1Icon: '🪨',
+                skill1Cd: 2.5,
+                skill2Name: 'Taş Heykel',
+                skill2Icon: '🗿',
+                skill2Cd: 5.5
+            },
+            {
+                id: 'water',
+                num: 4,
+                name: 'Su Büyüsü',
+                icon: '🌊',
+                color: '#0284c7',
+                desc: 'Basınçlı su topu atar ve tazyikli su fışkırtarak orduları geri iter.',
+                skill1Name: 'Su Topu',
+                skill1Icon: '💧',
+                skill1Cd: 2.0,
+                skill2Name: 'Su Fışkırt',
+                skill2Icon: '🌊',
+                skill2Cd: 4.5
+            },
+            {
+                id: 'lightning',
+                num: 6,
+                name: 'Yıldırım Büyüsü',
+                icon: '⚡',
+                color: '#eab308',
+                desc: 'Gökten şimşek çaktırır ve zincirleme yıldırımla düşmanlara şok verir.',
+                skill1Name: 'Şimşek Çaktır',
+                skill1Icon: '🌩️',
+                skill1Cd: 2.4,
+                skill2Name: 'Yıldırım Şoku',
+                skill2Icon: '⚡',
+                skill2Cd: 5.0
+            },
+            {
+                id: 'wind',
+                num: 7,
+                name: 'Hava Büyüsü',
+                icon: '🌪️',
+                color: '#34d399',
+                desc: 'Düşmanları içine çeken dev bir hortum fırlatır ve rüzgarla geriye savurur.',
+                skill1Name: 'Dev Hortum',
+                skill1Icon: '🌪️',
+                skill1Cd: 3.0,
+                skill2Name: 'Rüzgar İtişi',
+                skill2Icon: '💨',
+                skill2Cd: 4.2
+            }
+        ];
+
+        // --- OYUN DURUMU (STATE) ---
+        const gameState = {
+            phase: 'INTRO', // INTRO, TRAINING, BATTLE_31, MAGIC_SELECT, GRAND_WAR, VICTORY, DEFEAT
+            worldWidth: 2400,
+            worldHeight: 1600,
+            camera: { x: 0, y: 0 },
+            selectedWeapon: null,
+            selectedMagic: null,
+            trainingHits: 0,
+            totalKills: 0,
+            lastTime: 0,
+            shakeTime: 0,
+            shakeIntensity: 0
+        };
+
+        // Oyuncu (Mavi Yuvarlak Kral)
+        const player = {
+            x: 600,
+            y: 500,
+            radius: 24,
+            hp: 200,
+            maxHp: 200,
+            damage: 50,
+            speed: 240,
+            angle: 0,
+            attackCooldown: 0,
+            skill1Cooldown: 0,
+            skill2Cooldown: 0,
+            swingAnim: 0,
+            shieldAnim: 0,
+            invulnTime: 0
+        };
+
+        // Varlık Dizileri
+        let dummies = [];
+        let allies = [];
+        let enemies = [];
+        let projectiles = [];
+        let effects = [];
+        let floatingTexts = [];
+
+        // Giriş Kontrolleri (Joystick & Klavye)
+        const input = {
+            joyX: 0,
+            joyY: 0,
+            keys: {}
+        };
+
+        // --- SES EFEKTLERİ (Web Audio API ile Harici Dosyasız Sentez) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration, vol = 0.12) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 0.4, audioCtx.currentTime + duration);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        // --- YARDIMCI FONKSİYONLAR ---
+        function addFloatingText(x, y, text, color = '#ffffff', size = 16) {
+            floatingTexts.push({
+                x, y, text, color, size,
+                vy: -45,
+                life: 0.9,
+                maxLife: 0.9
+            });
+        }
+
+        function triggerShake(duration = 0.15, intensity = 6) {
+            gameState.shakeTime = duration;
+            gameState.shakeIntensity = intensity;
+        }
+
+        function spawnParticles(x, y, color, count = 10, speed = 150) {
+            for (let i = 0; i < count; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const spd = (0.3 + Math.random() * 0.7) * speed;
+                effects.push({
+                    type: 'particle',
+                    x, y,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    radius: 3 + Math.random() * 4,
+                    color,
+                    life: 0.35 + Math.random() * 0.25,
+                    maxLife: 0.6
+                });
+            }
+        }
+
+        // --- AŞAMA BAŞLATICILAR ---
+        function startTrainingPhase() {
+            gameState.phase = 'TRAINING';
+            gameState.worldWidth = 1400;
+            gameState.worldHeight = 1000;
+            player.x = 700;
+            player.y = 550;
+            player.hp = 200;
+            player.maxHp = 200;
+            player.damage = 50;
+            gameState.trainingHits = 0;
+
+            dummies = [];
+            const positions = [
+                { x: 520, y: 400 },
+                { x: 700, y: 350 },
+                { x: 880, y: 400 },
+                { x: 550, y: 680 },
+                { x: 850, y: 680 }
+            ];
+            positions.forEach((p, idx) => {
+                dummies.push({
+                    id: idx,
+                    x: p.x,
+                    y: p.y,
+                    radius: 24,
+                    hp: 9999,
+                    hitFlash: 0
+                });
+            });
+
+            document.getElementById('cinematicModal').classList.add('hidden');
+            document.getElementById('hudPanel').classList.remove('hidden');
+            document.getElementById('controlsOverlay').classList.remove('hidden');
+            updateHUD();
+        }
+
+        function openWeaponSelection() {
+            document.getElementById('trainingReadyBanner').classList.add('hidden');
+            const container = document.getElementById('weaponCardsContainer');
+            container.innerHTML = '';
+
+            WEAPONS.forEach(w => {
+                const card = document.createElement('div');
+                if (w.locked) {
+                    card.className = 'bg-slate-950/60 border border-slate-800 rounded-2xl p-4 opacity-60 flex flex-col justify-between';
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400">${w.num}. Seçenek</span>
+                                <span class="text-xl">${w.icon}</span>
+                            </div>
+                            <h3 class="text-lg font-extrabold text-slate-400">${w.name}</h3>
+                            <p class="text-xs text-slate-500 mt-1">${w.desc}</p>
+                        </div>
+                        <div class="mt-4 py-2 text-center rounded-xl bg-slate-900 text-slate-500 text-xs font-bold border border-slate-800">
+                            🔒 31 Kişilik Orduyu Yenince Açılır
+                        </div>
+                    `;
+                } else {
+                    card.className = 'bg-slate-800/80 hover:bg-slate-800 border-2 border-slate-700 hover:border-amber-400 rounded-2xl p-4 transition cursor-pointer flex flex-col justify-between shadow-lg group';
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300">${w.num}. Seçenek</span>
+                                <span class="text-2xl group-hover:scale-110 transition">${w.icon}</span>
+                            </div>
+                            <h3 class="text-lg font-extrabold text-white">${w.name}</h3>
+                            <p class="text-xs text-slate-300 mt-1">${w.desc}</p>
+                            <div class="mt-3 space-y-1 text-[11px] bg-slate-900/70 p-2.5 rounded-xl">
+                                <div class="text-amber-300 font-semibold">⬡ Özellik 1: ${w.skill1Name}</div>
+                                <div class="text-purple-300 font-semibold">🛡️ Özellik 2: ${w.skill2Name}</div>
+                            </div>
+                        </div>
+                        <button class="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 group-hover:from-amber-500 group-hover:to-orange-600 text-white font-extrabold text-xs uppercase tracking-wider transition">
+                            Kuşan ve Savaşa Git ⚔️
+                        </button>
+                    `;
+                    card.onclick = () => selectWeaponAndStartBattle31(w);
+                }
+                container.appendChild(card);
+            });
+
+            document.getElementById('weaponModal').classList.remove('hidden');
+        }
+
+        function selectWeaponAndStartBattle31(weapon) {
+            gameState.selectedWeapon = weapon;
+            document.getElementById('weaponModal').classList.add('hidden');
+            startBattle31Phase();
+        }
+
+        function startBattle31Phase() {
+            gameState.phase = 'BATTLE_31';
+            gameState.worldWidth = 1800;
+            gameState.worldHeight = 1400;
+            dummies = [];
+            projectiles = [];
+            effects = [];
+            allies = [];
+            enemies = [];
+
+            // Oyuncu: 200 Can (Askerler 10 vurur = 20 vuruşta ölür), 50 Hasar (Askerler 100 Can = 2 vuruşta ölür)
+            player.x = 350;
+            player.y = 700;
+            player.hp = 200;
+            player.maxHp = 200;
+            player.damage = 50;
+            player.skill1Cooldown = 0;
+            player.skill2Cooldown = 0;
+
+            // 31 Kişilik Düşman Ordusu (Kırmızı Yuvarlaklar)
+            for (let i = 0; i < 31; i++) {
+                const col = i % 6;
+                const row = Math.floor(i / 6);
+                enemies.push({
+                    id: i,
+                    isKing: false,
+                    x: 1100 + col * 85 + (Math.random() * 30 - 15),
+                    y: 350 + row * 120 + (Math.random() * 30 - 15),
+                    radius: 20,
+                    hp: 100,
+                    maxHp: 100,
+                    damage: 10, // 20 vuruşta oyuncuyu öldürür (20 * 10 = 200)
+                    speed: 115 + Math.random() * 25,
+                    attackCd: Math.random() * 0.5,
+                    frozenTime: 0,
+                    petrifiedTime: 0,
+                    stunTime: 0,
+                    vx: 0,
+                    vy: 0
+                });
+            }
+
+            updateSkillButtonsUI();
+            updateHUD();
+            addFloatingText(player.x, player.y - 45, '31 KİŞİLİK ORDUYA SALDIR!', '#fbbf24', 20);
+        }
+
+        function openMagicSelection() {
+            gameState.phase = 'MAGIC_SELECT';
+            const container = document.getElementById('magicCardsContainer');
+            container.innerHTML = '';
+
+            MAGICS.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-800/90 hover:bg-slate-800 border-2 border-slate-700 hover:border-purple-400 rounded-2xl p-4 transition cursor-pointer flex flex-col justify-between shadow-xl group';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">${m.num}. Büyü Seçeneği</span>
+                            <span class="text-3xl group-hover:scale-125 transition">${m.icon}</span>
+                        </div>
+                        <h3 class="text-lg font-extrabold text-white" style="color:${m.color}">${m.name}</h3>
+                        <p class="text-xs text-slate-300 mt-1">${m.desc}</p>
+                        <div class="mt-3 space-y-1 text-[11px] bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                            <div class="text-amber-300 font-semibold">${m.skill1Icon} Özellik 1: ${m.skill1Name}</div>
+                            <div class="text-purple-300 font-semibold">${m.skill2Icon} Özellik 2: ${m.skill2Name}</div>
+                        </div>
+                    </div>
+                    <button class="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 group-hover:from-purple-500 group-hover:to-pink-600 text-white font-extrabold text-xs uppercase tracking-wider transition">
+                        Bu Büyüyü Seç ✨
+                    </button>
+                `;
+                card.onclick = () => selectMagicAndPrepareWar(m);
+                container.appendChild(card);
+            });
+
+            document.getElementById('magicModal').classList.remove('hidden');
+        }
+
+        function selectMagicAndPrepareWar(magic) {
+            gameState.selectedMagic = magic;
+            document.getElementById('magicModal').classList.add('hidden');
+            document.getElementById('warSelectedMagicText').textContent = `• Büyü: ${magic.name} (${magic.icon})`;
+            document.getElementById('warIntroModal').classList.remove('hidden');
+        }
+
+        function startGrandWarPhase() {
+            document.getElementById('warIntroModal').classList.add('hidden');
+            gameState.phase = 'GRAND_WAR';
+            gameState.worldWidth = 2800;
+            gameState.worldHeight = 2000;
+            projectiles = [];
+            effects = [];
+            allies = [];
+            enemies = [];
+
+            // KRAL (BİZ): 250 Can, 50 Hasar
+            player.x = 450;
+            player.y = 1000;
+            player.hp = 250;
+            player.maxHp = 250;
+            player.damage = 50;
+            player.skill1Cooldown = 0;
+            player.skill2Cooldown = 0;
+
+            // BİZİM ORDUMUZ: 20 Kişilik Askerler (100 Can, 25 Hasar)
+            for (let i = 0; i < 20; i++) {
+                const col = i % 4;
+                const row = Math.floor(i / 4);
+                allies.push({
+                    id: i,
+                    x: 320 + col * 65 + (Math.random() * 20 - 10),
+                    y: 780 + row * 105 + (Math.random() * 20 - 10),
+                    radius: 19,
+                    hp: 100,
+                    maxHp: 100,
+                    damage: 25,
+                    speed: 140 + Math.random() * 20,
+                    attackCd: Math.random() * 0.4,
+                    vx: 0,
+                    vy: 0
+                });
+            }
+
+            // DÜŞMAN ORDUSU: 150 Kişilik Askerler (100 Can, 25 Hasar)
+            for (let i = 0; i < 150; i++) {
+                const col = i % 10;
+                const row = Math.floor(i / 10);
+                enemies.push({
+                    id: i,
+                    isKing: false,
+                    x: 1550 + col * 95 + (Math.random() * 30 - 15),
+                    y: 250 + row * 100 + (Math.random() * 30 - 15),
+                    radius: 19,
+                    hp: 100,
+                    maxHp: 100,
+                    damage: 25,
+                    speed: 120 + Math.random() * 25,
+                    attackCd: Math.random() * 0.5,
+                    frozenTime: 0,
+                    petrifiedTime: 0,
+                    stunTime: 0,
+                    vx: 0,
+                    vy: 0
+                });
+            }
+
+            // DÜŞMAN KRALLARI: 3 İttifak Kralı (250 Can, 50 Hasar)
+            const kingPositions = [
+                { x: 2520, y: 650 },
+                { x: 2560, y: 1000 },
+                { x: 2520, y: 1350 }
+            ];
+            kingPositions.forEach((kp, idx) => {
+                enemies.push({
+                    id: 1000 + idx,
+                    isKing: true,
+                    x: kp.x,
+                    y: kp.y,
+                    radius: 26,
+                    hp: 250,
+                    maxHp: 250,
+                    damage: 50,
+                    speed: 135,
+                    attackCd: 0,
+                    frozenTime: 0,
+                    petrifiedTime: 0,
+                    stunTime: 0,
+                    vx: 0,
+                    vy: 0
+                });
+            });
+
+            updateSkillButtonsUI();
+            updateHUD();
+            addFloatingText(player.x, player.y - 50, 'BÜYÜK SAVAŞ BAŞLADI!', '#fbbf24', 22);
+        }
+
+        // --- UI GÜNCELLEMELERİ ---
+        function updateSkillButtonsUI() {
+            const btn1 = document.getElementById('btnSkill1');
+            const btn2 = document.getElementById('btnSkill2');
+            const icon1 = document.getElementById('iconSkill1');
+            const label1 = document.getElementById('labelSkill1');
+            const icon2 = document.getElementById('iconSkill2');
+            const label2 = document.getElementById('labelSkill2');
+            const iconAtk = document.getElementById('iconAttack');
+
+            if (gameState.phase === 'GRAND_WAR' && gameState.selectedMagic) {
+                const m = gameState.selectedMagic;
+                icon1.textContent = m.skill1Icon;
+                label1.textContent = m.skill1Name;
+                icon2.textContent = m.skill2Icon;
+                label2.textContent = m.skill2Name;
+                iconAtk.textContent = m.icon;
+                document.getElementById('hudWeaponName').textContent = `${m.name} ${m.icon}`;
+            } else if (gameState.selectedWeapon) {
+                const w = gameState.selectedWeapon;
+                icon1.textContent = w.skill1Icon;
+                label1.textContent = w.skill1Name;
+                icon2.textContent = w.skill2Icon;
+                label2.textContent = w.skill2Name;
+                iconAtk.textContent = w.icon.slice(0, 2);
+                document.getElementById('hudWeaponName').textContent = `${w.name}`;
+            } else {
+                icon1.textContent = '👊';
+                label1.textContent = 'Güç Vuruşu';
+                icon2.textContent = '💨';
+                label2.textContent = 'Hızlı Atılma';
+                iconAtk.textContent = '✊';
+                document.getElementById('hudWeaponName').textContent = 'Çıplak Yumruk (Eğitim)';
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('hudPlayerHp').textContent = Math.max(0, Math.ceil(player.hp));
+            const phaseTitle = document.getElementById('hudPhaseTitle');
+            const objText = document.getElementById('hudObjective');
+            const armyBox = document.getElementById('hudArmyCounter');
+
+            if (gameState.phase === 'TRAINING') {
+                phaseTitle.textContent = 'AŞAMA 1: GÜÇLENME';
+                objText.textContent = `Kuklalara vur (${gameState.trainingHits}/5) ve silahını seç!`;
+                armyBox.classList.add('hidden');
+            } else if (gameState.phase === 'BATTLE_31') {
+                phaseTitle.textContent = 'AŞAMA 2: İNTİKAM SAVAŞI';
+                objText.textContent = '31 kişilik hain orduyu yok et!';
+                armyBox.classList.remove('hidden');
+                document.getElementById('hudAllyCount').textContent = '1 (Sen)';
+                document.getElementById('hudEnemyCount').textContent = enemies.length;
+            } else if (gameState.phase === 'GRAND_WAR') {
+                phaseTitle.textContent = 'AŞAMA 3: KRALLIKLAR SAVAŞI';
+                objText.textContent = 'Düşman kralları ve 150 askerini ez!';
+                armyBox.classList.remove('hidden');
+                document.getElementById('hudAllyCount').textContent = allies.length + 1;
+                document.getElementById('hudEnemyCount').textContent = enemies.length;
+            }
+        }
+
+        // --- SALDIRI VE ÖZELLİK MEKANİKLERİ ---
+        function performBasicAttack() {
+            if (player.attackCooldown > 0) return;
+
+            // En yakın düşmana veya kuklaya otomatik yönelme (Mobil kolaylığı)
+            autoAimNearestTarget(380);
+
+            const isMagicWar = (gameState.phase === 'GRAND_WAR' && gameState.selectedMagic);
+            const w = gameState.selectedWeapon;
+
+            player.attackCooldown = isMagicWar ? 0.32 : (w ? w.attackCd : 0.35);
+            player.swingAnim = 0.22;
+
+            if (isMagicWar) {
+                // Büyücü modunda temel saldırı: Element küresi atar (50 Hasar)
+                const m = gameState.selectedMagic;
+                playTone(420, 'triangle', 0.15);
+                projectiles.push({
+                    x: player.x + Math.cos(player.angle) * 26,
+                    y: player.y + Math.sin(player.angle) * 26,
+                    vx: Math.cos(player.angle) * 580,
+                    vy: Math.sin(player.angle) * 580,
+                    radius: 10,
+                    damage: player.damage, // 50
+                    color: m.color,
+                    fromPlayer: true,
+                    life: 1.1,
+                    magicType: m.id
+                });
+                return;
+            }
+
+            if (w && w.id === 'bow') {
+                // Yay ve Ok: Hızlı ok fırlatır
+                playTone(520, 'sine', 0.12);
+                projectiles.push({
+                    x: player.x + Math.cos(player.angle) * 26,
+                    y: player.y + Math.sin(player.angle) * 26,
+                    vx: Math.cos(player.angle) * 680,
+                    vy: Math.sin(player.angle) * 680,
+                    radius: 7,
+                    damage: player.damage, // 50
+                    color: '#fbbf24',
+                    fromPlayer: true,
+                    isArrow: true,
+                    angle: player.angle,
+                    life: 1.0
+                });
+            } else {
+                // Yakın Dövüş (Yumruk, Kılıç, Çift Balta, Mızrak)
+                const range = w ? w.range : 85;
+                const arc = (w && w.id === 'spear_shield') ? 0.75 : 1.35;
+                playTone(220, 'sawtooth', 0.12);
+
+                effects.push({
+                    type: 'slash',
+                    x: player.x,
+                    y: player.y,
+                    angle: player.angle,
+                    radius: range,
+                    arc: arc,
+                    color: w ? w.color : '#60a5fa',
+                    life: 0.18,
+                    maxLife: 0.18
+                });
+
+                applyMeleeDamage(player.x, player.y, range, player.angle, arc, player.damage, 120);
+            }
+        }
+
+        function performSkill1() {
+            if (player.skill1Cooldown > 0) return;
+            autoAimNearestTarget(450);
+
+            // BÜYÜ SAVAŞI ÖZELLİK 1
+            if (gameState.phase === 'GRAND_WAR' && gameState.selectedMagic) {
+                const m = gameState.selectedMagic;
+                player.skill1Cooldown = m.skill1Cd;
+                playTone(340, 'sawtooth', 0.25);
+
+                if (m.id === 'fire') {
+                    // 1. Ateş Topu Atmak (Büyük patlayan ateş topu)
+                    projectiles.push({
+                        x: player.x + Math.cos(player.angle) * 30,
+                        y: player.y + Math.sin(player.angle) * 30,
+                        vx: Math.cos(player.angle) * 520,
+                        vy: Math.sin(player.angle) * 520,
+                        radius: 18,
+                        damage: 100,
+                        color: '#ef4444',
+                        fromPlayer: true,
+                        aoeRadius: 110,
+                        life: 1.3
+                    });
+                } else if (m.id === 'ice') {
+                    // 2. Buz Topları Atmak (3'lü delici buz topu)
+                    [-0.22, 0, 0.22].forEach(offset => {
+                        const a = player.angle + offset;
+                        projectiles.push({
+                            x: player.x + Math.cos(a) * 28,
+                            y: player.y + Math.sin(a) * 28,
+                            vx: Math.cos(a) * 560,
+                            vy: Math.sin(a) * 560,
+                            radius: 13,
+                            damage: 75,
+                            color: '#38bdf8',
+                            fromPlayer: true,
+                            freezeDuration: 2.5,
+                            life: 1.2
+                        });
+                    });
+                } else if (m.id === 'earth') {
+                    // 3. Büyük Taşlar Fırlatmak (Devasa kaya, yolundaki herkesi ezer)
+                    projectiles.push({
+                        x: player.x + Math.cos(player.angle) * 32,
+                        y: player.y + Math.sin(player.angle) * 32,
+                        vx: Math.cos(player.angle) * 440,
+                        vy: Math.sin(player.angle) * 440,
+                        radius: 26,
+                        damage: 100,
+                        color: '#78716c',
+                        fromPlayer: true,
+                        piercing: true,
+                        knockback: 260,
+                        life: 1.4
+                    });
+                } else if (m.id === 'water') {
+                    // 4. Su Topu Atmak (Hızlı ve patlayıcı su küresi)
+                    projectiles.push({
+                        x: player.x + Math.cos(player.angle) * 28,
+                        y: player.y + Math.sin(player.angle) * 28,
+                        vx: Math.cos(player.angle) * 620,
+                        vy: Math.sin(player.angle) * 620,
+                        radius: 19,
+                        damage: 90,
+                        color: '#0ea5e9',
+                        fromPlayer: true,
+                        aoeRadius: 95,
+                        knockback: 220,
+                        life: 1.2
+                    });
+                } else if (m.id === 'lightning') {
+                    // 6. Şimşek Çaktırmak (Hedef bölgedeki düşmanlara gökten şimşek)
+                    const tx = player.x + Math.cos(player.angle) * 240;
+                    const ty = player.y + Math.sin(player.angle) * 240;
+                    triggerShake(0.2, 8);
+                    effects.push({
+                        type: 'ring',
+                        x: tx, y: ty,
+                        radius: 10, maxRadius: 130,
+                        color: '#facc15',
+                        life: 0.35, maxLife: 0.35
+                    });
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - tx, e.y - ty) <= 130) {
+                            damageEnemy(e, 100, '#facc15');
+                            e.stunTime = 1.5;
+                        }
+                    });
+                    addFloatingText(tx, ty - 20, '⚡ ŞİMŞEK!', '#fef08a', 18);
+                } else if (m.id === 'wind') {
+                    // 7. Dev Bir Hortum Fırlatmak (Düşmanları içine çekip savuran dev hortum)
+                    projectiles.push({
+                        x: player.x + Math.cos(player.angle) * 35,
+                        y: player.y + Math.sin(player.angle) * 35,
+                        vx: Math.cos(player.angle) * 330,
+                        vy: Math.sin(player.angle) * 330,
+                        radius: 42,
+                        damage: 65,
+                        color: '#34d399',
+                        fromPlayer: true,
+                        isTornado: true,
+                        piercing: true,
+                        life: 2.2
+                    });
+                }
+                return;
+            }
+
+            // SİLAH MODU ÖZELLİK 1
+            const w = gameState.selectedWeapon;
+            player.skill1Cooldown = w ? w.skill1Cd : 2.5;
+            playTone(380, 'triangle', 0.2);
+
+            if (!w) {
+                // Eğitim Güç Vuruşu
+                effects.push({ type: 'ring', x: player.x, y: player.y, radius: 10, maxRadius: 110, color: '#38bdf8', life: 0.3, maxLife: 0.3 });
+                applyMeleeDamage(player.x, player.y, 110, 0, Math.PI * 2, 50, 150);
+            } else if (w.id === 'bow') {
+                // Üçlü Ok
+                [-0.2, 0, 0.2].forEach(off => {
+                    const a = player.angle + off;
+                    projectiles.push({
+                        x: player.x + Math.cos(a) * 26,
+                        y: player.y + Math.sin(a) * 26,
+                        vx: Math.cos(a) * 700,
+                        vy: Math.sin(a) * 700,
+                        radius: 8,
+                        damage: 50,
+                        color: '#f59e0b',
+                        fromPlayer: true,
+                        isArrow: true,
+                        angle: a,
+                        life: 1.0
+                    });
+                });
+            } else if (w.id === 'sword_shield') {
+                // Kalkan Vuruşu (Sersemletir ve geri iter)
+                effects.push({ type: 'slash', x: player.x, y: player.y, angle: player.angle, radius: 115, arc: 1.6, color: '#38bdf8', life: 0.25, maxLife: 0.25 });
+                applyMeleeDamage(player.x, player.y, 115, player.angle, 1.6, 50, 280, 1.5);
+            } else if (w.id === 'dual_axes') {
+                // Çifte Yarık (100 Hasar = Tek vuruşta asker öldürür)
+                effects.push({ type: 'slash', x: player.x, y: player.y, angle: player.angle, radius: 110, arc: 1.8, color: '#f43f5e', life: 0.25, maxLife: 0.25 });
+                applyMeleeDamage(player.x, player.y, 110, player.angle, 1.8, 100, 150);
+            } else if (w.id === 'spear_shield') {
+                // Uzun Saplama
+                effects.push({ type: 'slash', x: player.x, y: player.y, angle: player.angle, radius: 185, arc: 0.65, color: '#10b981', life: 0.25, maxLife: 0.25 });
+                applyMeleeDamage(player.x, player.y, 185, player.angle, 0.65, 100, 180);
+            }
+        }
+
+        function performSkill2() {
+            if (player.skill2Cooldown > 0) return;
+            autoAimNearestTarget(450);
+
+            // BÜYÜ SAVAŞI ÖZELLİK 2
+            if (gameState.phase === 'GRAND_WAR' && gameState.selectedMagic) {
+                const m = gameState.selectedMagic;
+                player.skill2Cooldown = m.skill2Cd;
+                playTone(260, 'sawtooth', 0.35);
+
+                if (m.id === 'fire') {
+                    // 1. Ateş Püskürtmek (Geniş koni şeklinde alev dalgası)
+                    effects.push({ type: 'slash', x: player.x, y: player.y, angle: player.angle, radius: 220, arc: 1.3, color: '#f97316', life: 0.4, maxLife: 0.4 });
+                    applyMeleeDamage(player.x, player.y, 220, player.angle, 1.3, 100, 140);
+                    addFloatingText(player.x, player.y - 35, '🔥 ATEŞ PÜSKÜRTME!', '#fb923c', 16);
+                } else if (m.id === 'ice') {
+                    // 2. Dondurmak (Etrafındaki tüm düşmanları 3.5 saniye buz kütlesine çevirir)
+                    effects.push({ type: 'ring', x: player.x, y: player.y, radius: 20, maxRadius: 240, color: '#7dd3fc', life: 0.45, maxLife: 0.45 });
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - player.x, e.y - player.y) <= 240) {
+                            e.frozenTime = 3.5;
+                            damageEnemy(e, 50, '#38bdf8');
+                        }
+                    });
+                    addFloatingText(player.x, player.y - 35, '❄️ DONDURULDU!', '#7dd3fc', 16);
+                } else if (m.id === 'earth') {
+                    // 3. Düşmanı Taştan Heykele Çevirmek (4 saniye taş heykel yapar)
+                    effects.push({ type: 'ring', x: player.x, y: player.y, radius: 20, maxRadius: 230, color: '#a8a29e', life: 0.45, maxLife: 0.45 });
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - player.x, e.y - player.y) <= 230) {
+                            e.petrifiedTime = 4.0;
+                            damageEnemy(e, 50, '#d6d3d1');
+                        }
+                    });
+                    addFloatingText(player.x, player.y - 35, '🗿 TAŞ HEYKEL!', '#d6d3d1', 16);
+                } else if (m.id === 'water') {
+                    // 4. Su Fışkırtmak (Tazyikli su dalgası ile düşmanları çok uzağa fırlatır)
+                    effects.push({ type: 'slash', x: player.x, y: player.y, angle: player.angle, radius: 250, arc: 1.4, color: '#0284c7', life: 0.4, maxLife: 0.4 });
+                    applyMeleeDamage(player.x, player.y, 250, player.angle, 1.4, 75, 480);
+                    addFloatingText(player.x, player.y - 35, '🌊 TAZYİKLİ SU!', '#38bdf8', 16);
+                } else if (m.id === 'lightning') {
+                    // 6. Yıldırımla Adama Şok Vermek (Etraftaki düşmanlara elektrik şoku ve felç)
+                    triggerShake(0.25, 9);
+                    effects.push({ type: 'ring', x: player.x, y: player.y, radius: 15, maxRadius: 250, color: '#eab308', life: 0.4, maxLife: 0.4 });
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - player.x, e.y - player.y) <= 250) {
+                            e.stunTime = 2.8;
+                            damageEnemy(e, 85, '#facc15');
+                        }
+                    });
+                    addFloatingText(player.x, player.y - 35, '⚡ YILDIRIM ŞOKU!', '#fef08a', 16);
+                } else if (m.id === 'wind') {
+                    // 7. Rüzgarla Adamı Geriye Fırlatmak (Devasa rüzgar patlaması)
+                    effects.push({ type: 'ring', x: player.x, y: player.y, radius: 15, maxRadius: 270, color: '#6ee7b7', life: 0.4, maxLife: 0.4 });
+                    enemies.forEach(e => {
+                        const dist = Math.hypot(e.x - player.x, e.y - player.y);
+                        if (dist <= 270) {
+                            const ang = Math.atan2(e.y - player.y, e.x - player.x);
+                            e.vx += Math.cos(ang) * 550;
+                            e.vy += Math.sin(ang) * 550;
+                            damageEnemy(e, 50, '#6ee7b7');
+                        }
+                    });
+                    addFloatingText(player.x, player.y - 35, '💨 RÜZGAR FIRTINASI!', '#6ee7b7', 16);
+                }
+                return;
+            }
+
+            // SİLAH MODU ÖZELLİK 2
+            const w = gameState.selectedWeapon;
+            player.skill2Cooldown = w ? w.skill2Cd : 3.0;
+            playTone(300, 'sine', 0.25);
+
+            if (!w) {
+                // Eğitim Hızlı Atılma
+                player.x += Math.cos(player.angle) * 120;
+                player.y += Math.sin(player.angle) * 120;
+                spawnParticles(player.x, player.y, '#38bdf8', 12);
+            } else if (w.id === 'bow') {
+                // Ok Yağmuru (7 ok yelpazesi)
+                for (let i = -3; i <= 3; i++) {
+                    const a = player.angle + i * 0.14;
+                    projectiles.push({
+                        x: player.x + Math.cos(a) * 26,
+                        y: player.y + Math.sin(a) * 26,
+                        vx: Math.cos(a) * 680,
+                        vy: Math.sin(a) * 680,
+                        radius: 8,
+                        damage: 50,
+                        color: '#fbbf24',
+                        fromPlayer: true,
+                        isArrow: true,
+                        angle: a,
+                        life: 1.1
+                    });
+                }
+            } else if (w.id === 'sword_shield') {
+                // Kral Kesiği (360 derece alan hasarı)
+                effects.push({ type: 'ring', x: player.x, y: player.y, radius: 15, maxRadius: 145, color: '#38bdf8', life: 0.35, maxLife: 0.35 });
+                applyMeleeDamage(player.x, player.y, 145, 0, Math.PI * 2, 100, 220);
+            } else if (w.id === 'dual_axes') {
+                // Balta Kasırgası (Geniş 360 derece kasırga)
+                effects.push({ type: 'ring', x: player.x, y: player.y, radius: 15, maxRadius: 165, color: '#f43f5e', life: 0.35, maxLife: 0.35 });
+                applyMeleeDamage(player.x, player.y, 165, 0, Math.PI * 2, 100, 180);
+            } else if (w.id === 'spear_shield') {
+                // Kalkan Hücumu (İleri atılır ve yolundakileri ezer)
+                const dashDist = 170;
+                const steps = 5;
+                for (let s = 1; s <= steps; s++) {
+                    const nx = player.x + Math.cos(player.angle) * (dashDist / steps);
+                    const ny = player.y + Math.sin(player.angle) * (dashDist / steps);
+                    player.x = Math.max(30, Math.min(gameState.worldWidth - 30, nx));
+                    player.y = Math.max(30, Math.min(gameState.worldHeight - 30, ny));
+                    applyMeleeDamage(player.x, player.y, 85, 0, Math.PI * 2, 100, 260);
+                }
+                spawnParticles(player.x, player.y, '#10b981', 15);
+            }
+        }
+
+        function autoAimNearestTarget(maxRange) {
+            let bestDist = maxRange;
+            let target = null;
+
+            if (gameState.phase === 'TRAINING') {
+                dummies.forEach(d => {
+                    const dist = Math.hypot(d.x - player.x, d.y - player.y);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        target = d;
+                    }
+                });
+            } else {
+                enemies.forEach(e => {
+                    const dist = Math.hypot(e.x - player.x, e.y - player.y);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        target = e;
+                    }
+                });
+            }
+
+            if (target) {
+                player.angle = Math.atan2(target.y - player.y, target.x - player.x);
+            }
+        }
+
+        function applyMeleeDamage(ox, oy, range, facingAngle, arcAngle, dmg, knockback = 100, stunSec = 0) {
+            if (gameState.phase === 'TRAINING') {
+                dummies.forEach(d => {
+                    const dx = d.x - ox;
+                    const dy = d.y - oy;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist <= range + d.radius) {
+                        d.hitFlash = 0.2;
+                        gameState.trainingHits++;
+                        spawnParticles(d.x, d.y, '#fbbf24', 8);
+                        addFloatingText(d.x, d.y - 30, '+GÜÇ!', '#34d399', 16);
+                        updateHUD();
+                        if (gameState.trainingHits >= 5) {
+                            document.getElementById('trainingReadyBanner').classList.remove('hidden');
+                        }
+                    }
+                });
+                return;
+            }
+
+            enemies.forEach(e => {
+                const dx = e.x - ox;
+                const dy = e.y - oy;
+                const dist = Math.hypot(dx, dy);
+                if (dist <= range + e.radius) {
+                    let angleDiff = Math.abs(Math.atan2(dy, dx) - facingAngle);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+                    if (arcAngle >= Math.PI * 1.9 || angleDiff <= arcAngle * 0.5 + 0.25) {
+                        const pushAng = Math.atan2(dy, dx);
+                        e.vx += Math.cos(pushAng) * knockback;
+                        e.vy += Math.sin(pushAng) * knockback;
+                        if (stunSec > 0) e.stunTime = Math.max(e.stunTime, stunSec);
+                        damageEnemy(e, dmg);
+                    }
+                }
+            });
+        }
+
+        function damageEnemy(enemy, dmg, textColor = '#f87171') {
+            enemy.hp -= dmg;
+            spawnParticles(enemy.x, enemy.y, '#ef4444', 7);
+            addFloatingText(enemy.x, enemy.y - 24, `-${dmg}`, textColor, 15);
+            triggerShake(0.08, 3);
+
+            if (enemy.hp <= 0) {
+                const idx = enemies.indexOf(enemy);
+                if (idx !== -1) {
+                    enemies.splice(idx, 1);
+                    gameState.totalKills++;
+                    spawnParticles(enemy.x, enemy.y, enemy.isKing ? '#fbbf24' : '#dc2626', 16, 200);
+                    if (enemy.isKing) {
+                        addFloatingText(enemy.x, enemy.y - 30, '👑 DÜŞMAN KRALI DÜŞTÜ!', '#fbbf24', 18);
+                        triggerShake(0.3, 10);
+                    }
+                }
+                updateHUD();
+                checkPhaseCompletion();
+            }
+        }
+
+        function checkPhaseCompletion() {
+            if (gameState.phase === 'BATTLE_31' && enemies.length === 0) {
+                setTimeout(() => {
+                    openMagicSelection();
+                }, 700);
+            } else if (gameState.phase === 'GRAND_WAR' && enemies.length === 0) {
+                gameState.phase = 'VICTORY';
+                setTimeout(() => {
+                    document.getElementById('endIcon').textContent = '👑🏆';
+                    document.getElementById('endTitle').textContent = 'MUTLAK ZAFER!';
+                    document.getElementById('endTitle').className = 'font-cinzel text-3xl font-black text-amber-400';
+                    document.getElementById('endDesc').textContent = 'Sana ihanet eden tüm orduları, birleşmiş krallıkları ve 3 düşman kralını yok ettin. İntikamın tamamlandı!';
+                    document.getElementById('endKills').textContent = gameState.totalKills;
+                    document.getElementById('endHpLeft').textContent = Math.max(0, Math.ceil(player.hp));
+                    document.getElementById('endModal').classList.remove('hidden');
+                }, 700);
+            }
+        }
+
+        function triggerDefeat() {
+            if (gameState.phase === 'DEFEAT') return;
+            gameState.phase = 'DEFEAT';
+            document.getElementById('endIcon').textContent = '💀';
+            document.getElementById('endTitle').textContent = 'KRAL DÜŞTÜ...';
+            document.getElementById('endTitle').className = 'font-cinzel text-3xl font-black text-rose-500';
+            document.getElementById('endDesc').textContent = 'Düşman ordusu seni alt etti. Ama gerçek bir kral asla pes etmez, tekrar ayağa kalk ve intikamını al!';
+            document.getElementById('endKills').textContent = gameState.totalKills;
+            document.getElementById('endHpLeft').textContent = '0';
+            document.getElementById('endModal').classList.remove('hidden');
+        }
+
+        // --- OYUN DÖNGÜSÜ (UPDATE) ---
+        function update(dt) {
+            if (['INTRO', 'MAGIC_SELECT', 'VICTORY', 'DEFEAT'].includes(gameState.phase)) return;
+            if (!document.getElementById('weaponModal').classList.contains('hidden')) return;
+            if (!document.getElementById('warIntroModal').classList.contains('hidden')) return;
+
+            // Soğuma süreleri (Cooldowns)
+            if (player.attackCooldown > 0) player.attackCooldown -= dt;
+            if (player.skill1Cooldown > 0) player.skill1Cooldown = Math.max(0, player.skill1Cooldown - dt);
+            if (player.skill2Cooldown > 0) player.skill2Cooldown = Math.max(0, player.skill2Cooldown - dt);
+            if (player.swingAnim > 0) player.swingAnim -= dt;
+            if (player.invulnTime > 0) player.invulnTime -= dt;
+            if (gameState.shakeTime > 0) gameState.shakeTime -= dt;
+
+            // Yetenek Butonu Soğuma Göstergeleri
+            const cd1El = document.getElementById('cdOverlay1');
+            const cd2El = document.getElementById('cdOverlay2');
+            if (player.skill1Cooldown > 0) {
+                cd1El.classList.remove('hidden');
+                cd1El.textContent = player.skill1Cooldown.toFixed(1);
+            } else {
+                cd1El.classList.add('hidden');
+            }
+            if (player.skill2Cooldown > 0) {
+                cd2El.classList.remove('hidden');
+                cd2El.textContent = player.skill2Cooldown.toFixed(1);
+            } else {
+                cd2El.classList.add('hidden');
+            }
+
+            // Oyuncu Hareketi (Joystick + Klavye)
+            let moveX = input.joyX;
+            let moveY = input.joyY;
+            if (input.keys['KeyW'] || input.keys['ArrowUp']) moveY -= 1;
+            if (input.keys['KeyS'] || input.keys['ArrowDown']) moveY += 1;
+            if (input.keys['KeyA'] || input.keys['ArrowLeft']) moveX -= 1;
+            if (input.keys['KeyD'] || input.keys['ArrowRight']) moveX += 1;
+
+            const mag = Math.hypot(moveX, moveY);
+            if (mag > 0.05) {
+                const normX = moveX / Math.max(1, mag);
+                const normY = moveY / Math.max(1, mag);
+                player.x += normX * player.speed * dt;
+                player.y += normY * player.speed * dt;
+                player.angle = Math.atan2(normY, normX);
+            }
+
+            // Dünya Sınırları
+            player.x = Math.max(player.radius, Math.min(gameState.worldWidth - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(gameState.worldHeight - player.radius, player.y));
+
+            // Kukla animasyonu
+            dummies.forEach(d => {
+                if (d.hitFlash > 0) d.hitFlash -= dt;
+            });
+
+            // DOST ASKERLERİN YAPAY ZEKASI (Büyük Savaşta 20 Asker)
+            allies.forEach(ally => {
+                if (ally.attackCd > 0) ally.attackCd -= dt;
+                ally.x += ally.vx * dt;
+                ally.y += ally.vy * dt;
+                ally.vx *= 0.85;
+                ally.vy *= 0.85;
+
+                // En yakın düşmanı bul
+                let nearest = null;
+                let minDist = Infinity;
+                enemies.forEach(e => {
+                    const d = Math.hypot(e.x - ally.x, e.y - ally.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = e;
+                    }
+                });
+
+                if (nearest) {
+                    const ang = Math.atan2(nearest.y - ally.y, nearest.x - ally.x);
+                    if (minDist > ally.radius + nearest.radius + 8) {
+                        ally.x += Math.cos(ang) * ally.speed * dt;
+                        ally.y += Math.sin(ang) * ally.speed * dt;
+                    } else if (ally.attackCd <= 0) {
+                        ally.attackCd = 0.85;
+                        damageEnemy(nearest, ally.damage, '#7dd3fc');
+                    }
+                }
+            });
+
+            // DÜŞMAN ASKERLER VE KRALLARIN YAPAY ZEKASI
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                if (e.attackCd > 0) e.attackCd -= dt;
+                if (e.frozenTime > 0) { e.frozenTime -= dt; continue; }
+                if (e.petrifiedTime > 0) { e.petrifiedTime -= dt; continue; }
+                if (e.stunTime > 0) { e.stunTime -= dt; continue; }
+
+                // Geri tepme fiziği
+                e.x += e.vx * dt;
+                e.y += e.vy * dt;
+                e.vx *= 0.85;
+                e.vy *= 0.85;
+
+                // En yakın hedefi seç (Oyuncu Kral veya Dost Askerler)
+                let target = player;
+                let minDist = Math.hypot(player.x - e.x, player.y - e.y);
+
+                allies.forEach(ally => {
+                    const d = Math.hypot(ally.x - e.x, ally.y - e.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        target = ally;
+                    }
+                });
+
+                // Düşmanların üst üste binmesini önleyen hafif ayrışma
+                for (let j = 0; j < enemies.length; j++) {
+                    if (i === j) continue;
+                    const other = enemies[j];
+                    const dx = e.x - other.x;
+                    const dy = e.y - other.y;
+                    const d = Math.hypot(dx, dy);
+                    const minSep = e.radius + other.radius;
+                    if (d > 0 && d < minSep) {
+                        e.x += (dx / d) * 40 * dt;
+                        e.y += (dy / d) * 40 * dt;
+                    }
+                }
+
+                const ang = Math.atan2(target.y - e.y, target.x - e.x);
+                const reach = e.radius + target.radius + 8;
+
+                if (minDist > reach) {
+                    e.x += Math.cos(ang) * e.speed * dt;
+                    e.y += Math.sin(ang) * e.speed * dt;
+                } else if (e.attackCd <= 0) {
+                    e.attackCd = 0.95;
+                    if (target === player) {
+                        player.hp -= e.damage;
+                        spawnParticles(player.x, player.y, '#ef4444', 6);
+                        addFloatingText(player.x, player.y - 28, `-${e.damage}`, '#ef4444', 16);
+                        triggerShake(0.1, 4);
+                        updateHUD();
+                        if (player.hp <= 0) {
+                            player.hp = 0;
+                            updateHUD();
+                            triggerDefeat();
+                            return;
+                        }
+                    } else {
+                        // Dost askere vurdu
+                        target.hp -= e.damage;
+                        spawnParticles(target.x, target.y, '#38bdf8', 5);
+                        if (target.hp <= 0) {
+                            const aIdx = allies.indexOf(target);
+                            if (aIdx !== -1) allies.splice(aIdx, 1);
+                            updateHUD();
+                        }
+                    }
+                }
+
+                e.x = Math.max(e.radius, Math.min(gameState.worldWidth - e.radius, e.x));
+                e.y = Math.max(e.radius, Math.min(gameState.worldHeight - e.radius, e.y));
+            }
+
+            // MERMİLER / OKLAR / BÜYÜ KÜRELERİ
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+
+                if (p.isTornado) {
+                    // Dev hortum etrafındaki düşmanları içine çeker ve hasar verir
+                    enemies.forEach(e => {
+                        const d = Math.hypot(e.x - p.x, e.y - p.y);
+                        if (d < p.radius + 45) {
+                            const pullAng = Math.atan2(p.y - e.y, p.x - e.x);
+                            e.x += Math.cos(pullAng) * 280 * dt;
+                            e.y += Math.sin(pullAng) * 280 * dt;
+                            if (Math.random() < 0.15) damageEnemy(e, 25, '#34d399');
+                        }
+                    });
+                }
+
+                if (p.life <= 0) {
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                if (gameState.phase === 'TRAINING') {
+                    for (let d of dummies) {
+                        if (Math.hypot(d.x - p.x, d.y - p.y) <= d.radius + p.radius) {
+                            d.hitFlash = 0.2;
+                            gameState.trainingHits++;
+                            spawnParticles(d.x, d.y, '#fbbf24', 8);
+                            addFloatingText(d.x, d.y - 30, '+GÜÇ!', '#34d399', 16);
+                            updateHUD();
+                            if (gameState.trainingHits >= 5) {
+                                document.getElementById('trainingReadyBanner').classList.remove('hidden');
+                            }
+                            projectiles.splice(i, 1);
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+                // Düşmanlara çarpma kontrolü
+                if (!p.isTornado) {
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const e = enemies[j];
+                        if (Math.hypot(e.x - p.x, e.y - p.y) <= e.radius + p.radius) {
+                            if (p.aoeRadius) {
+                                // Alan patlaması (Ateş Topu / Su Topu)
+                                effects.push({ type: 'ring', x: p.x, y: p.y, radius: 10, maxRadius: p.aoeRadius, color: p.color, life: 0.3, maxLife: 0.3 });
+                                enemies.forEach(other => {
+                                    if (Math.hypot(other.x - p.x, other.y - p.y) <= p.aoeRadius) {
+                                        if (p.knockback) {
+                                            const ka = Math.atan2(other.y - p.y, other.x - p.x);
+                                            other.vx += Math.cos(ka) * p.knockback;
+                                            other.vy += Math.sin(ka) * p.knockback;
+                                        }
+                                        damageEnemy(other, p.damage, p.color);
+                                    }
+                                });
+                            } else {
+                                if (p.freezeDuration) e.frozenTime = p.freezeDuration;
+                                if (p.knockback) {
+                                    const ka = Math.atan2(p.vy, p.vx);
+                                    e.vx += Math.cos(ka) * p.knockback;
+                                    e.vy += Math.sin(ka) * p.knockback;
+                                }
+                                damageEnemy(e, p.damage, p.color);
+                            }
+
+                            if (!p.piercing) {
+                                projectiles.splice(i, 1);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // EFEKTLER VE UÇUŞAN YAZILAR
+            for (let i = effects.length - 1; i >= 0; i--) {
+                const ef = effects[i];
+                ef.life -= dt;
+                if (ef.type === 'particle') {
+                    ef.x += ef.vx * dt;
+                    ef.y += ef.vy * dt;
+                }
+                if (ef.life <= 0) effects.splice(i, 1);
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy * dt;
+                ft.life -= dt;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // Kamera Takibi
+            gameState.camera.x = player.x - canvas.width / 2;
+            gameState.camera.y = player.y - canvas.height / 2;
+            gameState.camera.x = Math.max(0, Math.min(Math.max(0, gameState.worldWidth - canvas.width), gameState.camera.x));
+            gameState.camera.y = Math.max(0, Math.min(Math.max(0, gameState.worldHeight - canvas.height), gameState.camera.y));
+        }
+
+        // --- ÇİZİM (RENDER) ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            let shakeX = 0, shakeY = 0;
+            if (gameState.shakeTime > 0) {
+                shakeX = (Math.random() - 0.5) * gameState.shakeIntensity * 2;
+                shakeY = (Math.random() - 0.5) * gameState.shakeIntensity * 2;
+            }
+            ctx.translate(-gameState.camera.x + shakeX, -gameState.camera.y + shakeY);
+
+            // Zemin (Aşamaya göre atmosferik arena)
+            if (gameState.phase === 'TRAINING') {
+                ctx.fillStyle = '#1e293b';
+            } else if (gameState.phase === 'BATTLE_31') {
+                ctx.fillStyle = '#1c1917';
+            } else {
+                ctx.fillStyle = '#14241b';
+            }
+            ctx.fillRect(0, 0, gameState.worldWidth, gameState.worldHeight);
+
+            // Zemin Izgarası ve Sınır Çizgisi
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            const gridSize = 80;
+            for (let x = 0; x <= gameState.worldWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, gameState.worldHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= gameState.worldHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(gameState.worldWidth, y);
+                ctx.stroke();
+            }
+
+            // Arena Sınır Duvarı
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(3, 3, gameState.worldWidth - 6, gameState.worldHeight - 6);
+
+            // EĞİTİM KUKLALARI
+            dummies.forEach(d => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+                ctx.fillStyle = d.hitFlash > 0 ? '#fbbf24' : '#92400e';
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#f59e0b';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('KUKLA', d.x, d.y);
+                ctx.restore();
+            });
+
+            // DOST ASKERLER (Açık Mavi Yuvarlaklar - İçinde Canları Yazar)
+            allies.forEach(ally => {
+                drawCharacterCircle(ally.x, ally.y, ally.radius, '#0284c7', '#7dd3fc', Math.ceil(ally.hp), false, false);
+            });
+
+            // DÜŞMAN ORDUSU VE KRALLAR (Kırmızı Yuvarlaklar - İçinde Canları Yazar)
+            enemies.forEach(e => {
+                let fill = e.isKing ? '#7f1d1d' : '#dc2626';
+                let stroke = e.isKing ? '#fbbf24' : '#fca5a5';
+
+                if (e.frozenTime > 0) {
+                    fill = '#0ea5e9';
+                    stroke = '#e0f2fe';
+                } else if (e.petrifiedTime > 0) {
+                    fill = '#57534e';
+                    stroke = '#d6d3d1';
+                } else if (e.stunTime > 0) {
+                    stroke = '#facc15';
+                }
+
+                drawCharacterCircle(e.x, e.y, e.radius, fill, stroke, Math.ceil(e.hp), e.isKing, true);
+            });
+
+            // OYUNCU (MAVİ YUVARLAK KRAL - İçinde Canı Yazar)
+            drawCharacterCircle(player.x, player.y, player.radius, '#2563eb', '#fbbf24', Math.ceil(player.hp), true, false);
+
+            // Oyuncunun Bakış Yönü Göstergesi (Silah / El)
+            const handX = player.x + Math.cos(player.angle) * (player.radius + 8);
+            const handY = player.y + Math.sin(player.angle) * (player.radius + 8);
+            ctx.beginPath();
+            ctx.arc(handX, handY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#fbbf24';
+            ctx.fill();
+
+            // MERMİLER / OKLAR / HORTUM
+            projectiles.forEach(p => {
+                ctx.save();
+                if (p.isTornado) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(52, 211, 153, 0.35)';
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#6ee7b7';
+                    ctx.setLineDash([10, 8]);
+                    ctx.stroke();
+                } else if (p.isArrow) {
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.angle);
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.fillRect(-14, -2.5, 28, 5);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.shadowColor = p.color;
+                    ctx.shadowBlur = 15;
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+
+            // VURUŞ VE BÜYÜ EFEKTLERİ
+            effects.forEach(ef => {
+                ctx.save();
+                const alpha = Math.max(0, ef.life / ef.maxLife);
+                ctx.globalAlpha = alpha;
+                if (ef.type === 'slash') {
+                    ctx.beginPath();
+                    ctx.moveTo(ef.x, ef.y);
+                    ctx.arc(ef.x, ef.y, ef.radius, ef.angle - ef.arc / 2, ef.angle + ef.arc / 2);
+                    ctx.closePath();
+                    ctx.fillStyle = ef.color;
+                    ctx.fill();
+                } else if (ef.type === 'ring') {
+                    const curR = ef.radius + (ef.maxRadius - ef.radius) * (1 - alpha);
+                    ctx.beginPath();
+                    ctx.arc(ef.x, ef.y, curR, 0, Math.PI * 2);
+                    ctx.lineWidth = 5;
+                    ctx.strokeStyle = ef.color;
+                    ctx.stroke();
+                } else if (ef.type === 'particle') {
+                    ctx.beginPath();
+                    ctx.arc(ef.x, ef.y, ef.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = ef.color;
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+
+            // UÇUŞAN HASAR SAYILARI
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife);
+                ctx.font = `900 ${ft.size}px Inter`;
+                ctx.fillStyle = ft.color;
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 4;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+
+            ctx.restore();
+
+            // Sağ Üst Köşeye Mini Harita (Büyük Savaş ve 31 Orduda)
+            if (gameState.phase === 'BATTLE_31' || gameState.phase === 'GRAND_WAR') {
+                drawMinimap();
+            }
+        }
+
+        // Her yuvarlak karakterin vücudunun içinde canını yazan fonksiyon
+        function drawCharacterCircle(x, y, radius, fillColor, strokeColor, hpValue, isKing, isEnemy) {
+            ctx.save();
+            // Gölge
+            ctx.beginPath();
+            ctx.arc(x, y + 4, radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fill();
+
+            // Ana Yuvarlak Vücut
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.lineWidth = isKing ? 3.5 : 2.5;
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+
+            // Kral Tacı Simgesi
+            if (isKing) {
+                ctx.font = '14px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('👑', x, y - radius - 4);
+            }
+
+            // Vücudun tam ortasında Can Değeri
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `800 ${isKing ? 13 : 11}px Inter`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(hpValue, x, y);
+            ctx.restore();
+        }
+
+        function drawMinimap() {
+            const mapW = 130;
+            const mapH = 90;
+            const padX = canvas.width - mapW - 16;
+            const padY = 76;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(padX, padY, mapW, mapH, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            const scaleX = mapW / gameState.worldWidth;
+            const scaleY = mapH / gameState.worldHeight;
+
+            // Dostlar
+            ctx.fillStyle = '#38bdf8';
+            allies.forEach(a => {
+                ctx.fillRect(padX + a.x * scaleX - 1.5, padY + a.y * scaleY - 1.5, 3, 3);
+            });
+
+            // Düşmanlar
+            enemies.forEach(e => {
+                ctx.fillStyle = e.isKing ? '#fbbf24' : '#ef4444';
+                const sz = e.isKing ? 4.5 : 2.5;
+                ctx.fillRect(padX + e.x * scaleX - sz / 2, padY + e.y * scaleY - sz / 2, sz, sz);
+            });
+
+            // Oyuncu
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.arc(padX + player.x * scaleX, padY + player.y * scaleY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- ANA DÖNGÜ ---
+        function gameLoop(timestamp) {
+            if (!gameState.lastTime) gameState.lastTime = timestamp;
+            const dt = Math.min(0.05, (timestamp - gameState.lastTime) / 1000);
+            gameState.lastTime = timestamp;
+
+            update(dt);
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- DOKUNMATİK JOYSTICK VE BUTON ETKİLEŞİMLERİ ---
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joyTouchId = null;
+
+        function updateJoystick(clientX, clientY) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxDist = rect.width / 2 - 20;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            input.joyX = dx / maxDist;
+            input.joyY = dy / maxDist;
+        }
+
+        function resetJoystick() {
+            joyTouchId = null;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+            input.joyX = 0;
+            input.joyY = 0;
+        }
+
+        joystickZone.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joyTouchId = touch.identifier;
+            updateJoystick(touch.clientX, touch.clientY);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', e => {
+            if (joyTouchId === null) return;
+            for (let t of e.changedTouches) {
+                if (t.identifier === joyTouchId) {
+                    updateJoystick(t.clientX, t.clientY);
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', e => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === joyTouchId) {
+                    resetJoystick();
+                }
+            }
+        });
+
+        // Fare ile de joystick kullanılabilsin
+        let mouseJoyActive = false;
+        joystickZone.addEventListener('mousedown', e => {
+            mouseJoyActive = true;
+            updateJoystick(e.clientX, e.clientY);
+        });
+        window.addEventListener('mousemove', e => {
+            if (mouseJoyActive) updateJoystick(e.clientX, e.clientY);
+        });
+        window.addEventListener('mouseup', () => {
+            if (mouseJoyActive) {
+                mouseJoyActive = false;
+                resetJoystick();
+            }
+        });
+
+        // Aksiyon Butonları (Touch + Click)
+        const btnAttack = document.getElementById('btnAttack');
+        const btnSkill1 = document.getElementById('btnSkill1');
+        const btnSkill2 = document.getElementById('btnSkill2');
+
+        btnAttack.addEventListener('touchstart', e => { e.preventDefault(); performBasicAttack(); }, { passive: false });
+        btnAttack.addEventListener('click', performBasicAttack);
+
+        btnSkill1.addEventListener('touchstart', e => { e.preventDefault(); performSkill1(); }, { passive: false });
+        btnSkill1.addEventListener('click', performSkill1);
+
+        btnSkill2.addEventListener('touchstart', e => { e.preventDefault(); performSkill2(); }, { passive: false });
+        btnSkill2.addEventListener('click', performSkill2);
+
+        // Klavye Desteği (WASD + Space + J + K)
+        window.addEventListener('keydown', e => {
+            input.keys[e.code] = true;
+            if (e.code === 'Space') performBasicAttack();
+            if (e.code === 'KeyJ') performSkill1();
+            if (e.code === 'KeyK') performSkill2();
+        });
+        window.addEventListener('keyup', e => {
+            input.keys[e.code] = false;
+        });
+
+        // Akış Butonları
+        document.getElementById('btnStartTraining').addEventListener('click', startTrainingPhase);
+        document.getElementById('btnOpenWeaponSelect').addEventListener('click', openWeaponSelection);
+        document.getElementById('btnStartGrandWar').addEventListener('click', startGrandWarPhase);
+
+        // Pencere yüklendiğinde animasyon döngüsünü başlat
+        window.onload = function () {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
+```
